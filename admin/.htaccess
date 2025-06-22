@@ -1,0 +1,25 @@
+# Disable directory browsing
+Options -Indexes
+
+# Deny access to .htaccess
+<Files .htaccess>
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Deny access to files with extensions .ini, .psd, .log, .sh
+<FilesMatch "\.(ini|psd|log|sh)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Prevent viewing of .php files source code
+<FilesMatch "\.php$">
+    Header set X-Content-Type-Options nosniff
+</FilesMatch>
+
+# Protect against XSS attacks
+Header set X-XSS-Protection "1; mode=block"
+
+# Enable CORS
+Header set Access-Control-Allow-Origin "*"

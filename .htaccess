@@ -1,0 +1,70 @@
+# For error handling
+ErrorDocument 404  /error404.php
+
+# For sitemap
+# RewriteEngine On
+# RewriteCond %{REQUEST_FILENAME} -d
+# RewriteRule ^(.*)$ - [R=404,L]
+# ErrorDocument 404 /error404.php
+
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+
+
+
+# Handle video URLs with category and title
+# RewriteRule ^video/([0-9]+)/([^/]+)/([^/]+)/?$ watch.php?id=$1&category=$2&slug=$3 [L,QSA]
+# RewriteRule ^video/([0-9]+)/([^/]+)/([^/]+)/?$ watch.php?category=$1&slug=$2 [L,QSA]
+
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Block search engine indexing for all responses
+    Header set X-Robots-Tag "noindex, nofollow"
+
+    # Custom URL routing: /video/18/fails/video-1 => watch.php?id=18&category=fails&slug=video-1
+    RewriteRule ^video/([0-9]+)/([^/]+)/([^/]+)/?$ watch.php?id=$1&category=$2&slug=$3 [L,QSA]
+</IfModule>
+
+
+
+
+
+# Remove multiple slashes
+RewriteCond %{REQUEST_URI} ^(.*)//(.*)$
+RewriteRule . %1/%2 [R=301,L]
+
+# Disable directory browsing
+Options -Indexes
+
+# Deny access to .htaccess
+<Files .htaccess>
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Deny access to files with extensions .ini, .psd, .log, .sh
+<FilesMatch "\.(ini|psd|log|sh)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Prevent viewing of .php files source code
+<FilesMatch "\.php$">
+    Header set X-Content-Type-Options nosniff
+</FilesMatch>
+
+# Protect against XSS attacks
+Header set X-XSS-Protection "1; mode=block"
+
+# Enable CORS
+Header set Access-Control-Allow-Origin "*"
+
+# Basic caching using Apache's cache control headers
+<IfModule mod_headers.c>
+    # 1 month for most static assets
+    <filesMatch ".(css|jpg|jpeg|png|gif|js|ico)$">
+        Header set Cache-Control "max-age=2592000, public"
+    </filesMatch>
+</IfModule>

@@ -1,0 +1,212 @@
+====================================================
+VIDEO PORTAL - HOSTING INSTRUCTIONS
+====================================================
+
+This document provides step-by-step instructions for hosting the Video Portal application on different environments.
+
+1. LOCAL HOSTING (XAMPP/WAMP)
+-----------------------------
+
+Prerequisites:
+- XAMPP or WAMP installed on your computer
+- PHP 7.4 or higher
+- MySQL 5.7 or higher
+
+Steps:
+
+1.1. Database Setup:
+   a) Open phpMyAdmin (http://localhost/phpmyadmin)
+   b) Create a new database named "video_portal"
+   c) Import the database schema from "database/db.sql"
+   d) Run the additional SQL from "add_slugs.sql" if needed
+
+1.2. Configuration:
+   a) Open "config/database.php"
+   b) Verify the database connection settings:
+      - DB_HOST: localhost
+      - DB_USER: root (or your MySQL username)
+      - DB_PASS: (your MySQL password, often empty for XAMPP)
+      - DB_NAME: video_portal
+
+1.3. File Permissions:
+   a) Ensure the "uploads" directory and its subdirectories are writable
+   b) On Windows: Right-click folder → Properties → Security → Edit → Add Everyone → Full Control
+   c) On Linux/Mac: chmod -R 755 uploads/
+
+1.4. Testing:
+   a) Open your browser and navigate to: http://localhost/video_portal/
+   b) Admin panel: http://localhost/video_portal/admin/login.php
+   c) Login with default credentials: admin@example.com / admin123
+
+2. SHARED HOSTING
+----------------
+
+Prerequisites:
+- Web hosting account with PHP 7.4+ and MySQL 5.7+
+- FTP access to your hosting account
+- cPanel or similar hosting control panel
+
+Steps:
+
+2.1. Database Setup:
+   a) Log in to your hosting control panel (cPanel, Plesk, etc.)
+   b) Create a new MySQL database
+   c) Create a database user and assign it to the database
+   d) Import the database schema from "database/db.sql"
+   e) Run the additional SQL from "add_slugs.sql"
+
+2.2. File Upload:
+   a) Connect to your hosting using FTP client (FileZilla, etc.)
+   b) Upload all files from the "video_portal" directory to your hosting
+      - You can upload to the root directory (public_html) or a subdirectory
+   c) Ensure proper file permissions:
+      - Directories: 755
+      - Files: 644
+      - uploads directory: 755
+
+2.3. Configuration:
+   a) Edit "config/database.php" with your hosting database details:
+      - DB_HOST: usually "localhost" (check with your hosting provider)
+      - DB_USER: your database username
+      - DB_PASS: your database password
+      - DB_NAME: your database name
+
+2.4. .htaccess Configuration:
+   a) If you installed in a subdirectory, you may need to modify the .htaccess file
+   b) Open the .htaccess file and update the RewriteBase directive:
+      - For root installation: RewriteBase /
+      - For subdirectory: RewriteBase /your-subdirectory/
+
+2.5. Testing:
+   a) Visit your website: https://yourdomain.com/video_portal/
+   b) Admin panel: https://yourdomain.com/video_portal/admin/login.php
+   c) Login with default credentials and change the password immediately
+
+3. VPS/DEDICATED SERVER
+----------------------
+
+Prerequisites:
+- VPS or dedicated server with root access
+- LAMP stack installed (Linux, Apache, MySQL, PHP)
+- Basic Linux command line knowledge
+
+Steps:
+
+3.1. Server Setup:
+   a) Install LAMP stack if not already installed:
+      ```
+      sudo apt update
+      sudo apt install apache2 mysql-server php libapache2-mod-php php-mysql
+      sudo apt install php-curl php-gd php-mbstring php-xml php-xmlrpc
+      ```
+   b) Enable Apache mod_rewrite:
+      ```
+      sudo a2enmod rewrite
+      sudo systemctl restart apache2
+      ```
+
+3.2. Database Setup:
+   a) Log in to MySQL:
+      ```
+      sudo mysql -u root -p
+      ```
+   b) Create database and user:
+      ```
+      CREATE DATABASE video_portal;
+      CREATE USER 'video_user'@'localhost' IDENTIFIED BY 'your_password';
+      GRANT ALL PRIVILEGES ON video_portal.* TO 'video_user'@'localhost';
+      FLUSH PRIVILEGES;
+      EXIT;
+      ```
+   c) Import database schema:
+      ```
+      mysql -u video_user -p video_portal < /path/to/db.sql
+      mysql -u video_user -p video_portal < /path/to/add_slugs.sql
+      ```
+
+3.3. File Deployment:
+   a) Copy files to web server directory:
+      ```
+      sudo cp -r video_portal /var/www/html/
+      ```
+   b) Set proper permissions:
+      ```
+      sudo chown -R www-data:www-data /var/www/html/video_portal
+      sudo chmod -R 755 /var/www/html/video_portal
+      sudo chmod -R 777 /var/www/html/video_portal/uploads
+      ```
+
+3.4. Apache Configuration:
+   a) Create a virtual host configuration:
+      ```
+      sudo nano /etc/apache2/sites-available/video_portal.conf
+      ```
+   b) Add the following configuration:
+      ```
+      <VirtualHost *:80>
+          ServerName yourdomain.com
+          ServerAlias www.yourdomain.com
+          DocumentRoot /var/www/html/video_portal
+          
+          <Directory /var/www/html/video_portal>
+              Options Indexes FollowSymLinks
+              AllowOverride All
+              Require all granted
+          </Directory>
+          
+          ErrorLog ${APACHE_LOG_DIR}/error.log
+          CustomLog ${APACHE_LOG_DIR}/access.log combined
+      </VirtualHost>
+      ```
+   c) Enable the site and restart Apache:
+      ```
+      sudo a2ensite video_portal.conf
+      sudo systemctl restart apache2
+      ```
+
+3.5. Configuration:
+   a) Update database connection settings in config/database.php
+
+3.6. Testing:
+   a) Visit your website: http://yourdomain.com/
+   b) Admin panel: http://yourdomain.com/admin/login.php
+
+4. SECURITY RECOMMENDATIONS
+--------------------------
+
+4.1. After Installation:
+   a) Change the default admin password immediately
+   b) Remove or restrict access to database SQL files
+   c) Set up SSL/HTTPS for your domain
+   d) Configure a firewall (UFW on Ubuntu)
+
+4.2. Regular Maintenance:
+   a) Keep PHP and MySQL updated
+   b) Regularly backup your database
+   c) Monitor error logs for suspicious activity
+   d) Implement rate limiting for login attempts
+
+5. TROUBLESHOOTING
+-----------------
+
+5.1. Common Issues:
+   a) 404 Not Found errors:
+      - Check that mod_rewrite is enabled
+      - Verify .htaccess file is properly configured
+      - Ensure AllowOverride is set to All in Apache config
+
+   b) Database connection errors:
+      - Verify database credentials in config/database.php
+      - Check if MySQL service is running
+      - Test database connection with a simple script
+
+   c) Upload permission issues:
+      - Check folder permissions on uploads directory
+      - Verify PHP has write access to the directory
+
+   d) Blank page or PHP errors:
+      - Enable error reporting in PHP
+      - Check PHP error logs
+      - Verify PHP version compatibility
+
+For additional support, please refer to the project documentation or contact the developer.
