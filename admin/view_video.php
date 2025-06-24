@@ -199,7 +199,14 @@ $video_tags = get_video_tags($video_id);
                                         <th>Preview URL:</th>
                                         <td>
                                             <?php if (!empty($video['slug'])): ?>
-                                                <a href="<?php echo htmlspecialchars("http://localhost/video/". $video['id'] . '/' . create_slug($video['category_name']) . '/' . create_slug($video['slug'])); ?>" target="_blank">
+                                                <?php 
+                                                    $video_preview = [
+                                                        'id' => $video['id'],
+                                                        'slug' => create_slug($video['slug']),
+                                                        'category_slug' => create_slug($video['category_name'])
+                                                    ];
+                                                ?>
+                                                <a href="<?php echo htmlspecialchars(get_video_url($video_preview)); ?>" target="_blank">
                                                     View on video
                                                     <i class="fas fa-external-link-alt ms-1"></i>
                                                 </a>

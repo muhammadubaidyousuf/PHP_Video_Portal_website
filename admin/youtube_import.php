@@ -115,8 +115,8 @@ if (!$YOUTUBE_API_KEY) {
     <h2 class="mb-4"><i class="fab fa-youtube"></i> YouTube Video Import</h2>
     <form id="yt-import-form" class="row g-3 mb-4">
         <div class="col-md-4">
-            <label for="yt-tag" class="form-label">YouTube Tag/Keyword</label>
-            <input type="text" class="form-control" id="yt-tag" name="tag" placeholder="e.g. tech, funny, etc" required>
+            <label for="yt-keyword" class="form-label">YouTube Keyword</label>
+            <input type="text" class="form-control" id="yt-keyword" name="keyword" placeholder="e.g. funny cats">
         </div>
         <div class="col-md-4">
             <label for="yt-category" class="form-label">Category</label>
@@ -186,22 +186,22 @@ if (!$YOUTUBE_API_KEY) {
 <script>
 const YT_API_KEY = '<?php echo $YOUTUBE_API_KEY; ?>';
 document.getElementById('fetch-videos').onclick = function() {
-    const tag = document.getElementById('yt-tag').value.trim();
+    const keyword = document.getElementById('yt-keyword').value.trim();
     const category = document.getElementById('yt-category').value;
     const dateFrom = document.getElementById('yt-date-from').value;
     const dateTo = document.getElementById('yt-date-to').value;
     const count = document.getElementById('yt-count').value;
     const type = document.getElementById('yt-type').value;
     const channel = document.getElementById('yt-channel').value.trim();
-    if (!tag || !category) {
-        alert('Tag and Category are required.');
+    if (!category && !channel) {
+        alert('Select a category or provide a Channel ID.');
         return;
     }
     document.getElementById('yt-error').style.display = 'none';
     fetch('youtube_import_fetch.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({tag, dateFrom, dateTo, count, type, channel, apiKey: YT_API_KEY})
+        body: JSON.stringify({keyword, dateFrom, dateTo, count, type, channel, category, apiKey: YT_API_KEY})
     })
     .then(r=>r.json())
     .then(data=>{
@@ -226,7 +226,7 @@ document.getElementById('fetch-videos').onclick = function() {
         document.getElementById('yt-preview-section').style.display = 'block';
     })
     .catch(()=>{
-        document.getElementById('yt-error').innerText = 'YouTube API se data fetch nahi ho saka.';
+        document.getElementById('yt-error').innerText = 'No data fetch from YouTube API';
         document.getElementById('yt-error').style.display = 'block';
     });
 };
@@ -236,7 +236,7 @@ if(document.getElementById('yt-save-form')){
         e.preventDefault();
         let selected = Array.from(document.querySelectorAll('input[name="videos[]"]:checked')).map(cb=>cb.value);
         if(selected.length == 0){
-            alert('Koi video select nahi ki gayi!');
+            alert('No video selected!');
             return;
         }
         let videoData = {};

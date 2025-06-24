@@ -184,6 +184,33 @@ function get_video_tags($video_id) {
 }
 
 // Upload thumbnail image
+// Build SEO-friendly URL for a video array having id, slug, category_slug
+function get_video_url($video) {
+    // Accepts array with keys: id, slug OR title, category_slug OR category_name
+    if (!isset($video['id'])) return '#';
+    // Determine slug
+    if (isset($video['slug']) && $video['slug'] !== '') {
+        $slug = $video['slug'];
+    } elseif (isset($video['title'])) {
+        $slug = create_slug($video['title']);
+    } else {
+        $slug = '';
+    }
+    // Determine category slug
+    if (isset($video['category_slug']) && $video['category_slug'] !== '') {
+        $category_slug = $video['category_slug'];
+    } elseif (isset($video['category_name'])) {
+        $category_slug = create_slug($video['category_name']);
+    } else {
+        $category_slug = '';
+    }
+    if ($slug === '' || $category_slug === '') {
+        return '#';
+    }
+    return '/video/' . $video['id'] . '/' . $category_slug . '/' . $slug;
+}
+
+
 function upload_thumbnail($file) {
     $target_dir = "../uploads/thumbnails/";
     $file_extension = strtolower(pathinfo($file["name"], PATHINFO_EXTENSION));
@@ -213,3 +240,9 @@ function upload_thumbnail($file) {
         return false;
     }
 }
+
+
+
+
+
+

@@ -319,14 +319,49 @@ $categories = get_categories();
     </nav>
 
     <!-- Main Content -->
-    <div class="container py-5">
-        <div class="row g-4">
-            <!-- Ad Sidebar: Visible on md+ screens, above videos on mobile -->
-            <div class="col-12 col-md-3 order-1 order-md-2 mb-4 mb-md-0">
+    <div class="container-fluid py-5">
+        <div class="row">
+            <!-- Left Ad Column -->
+            <aside class="col-lg-2 d-none d-lg-block">
+                <div class="sticky-top" style="top:90px;">
+                    <div class="card p-2 mb-3 text-center">
+                        <span class="text-muted small">(Left Ad Placeholder)</span>
+                    </div>
+                    <!-- Add more ad blocks if needed -->
+                </div>
+            </aside>
+            <!-- Main Videos Column -->
+            <main class="col-12 col-lg-8">
+                <div class="row g-4" id="videos-container">
+                    <!-- Videos will be loaded here via JavaScript -->
+                </div>
+                <!-- Load More Button -->
+                <div class="text-center my-4">
+                    <button id="load-more-btn" class="btn btn-outline-dark" style="display:none;">Load More</button>
+                </div>
+                <!-- Loading Spinner -->
+                <div class="loading-container" id="loading-spinner">
+                    <div class="loading-spinner"></div>
+                    <p class="mt-2 text-muted">Loading more videos...</p>
+                </div>
+            </main>
+            <!-- Right Ad Column -->
+            <aside class="col-lg-2 d-none d-lg-block">
+                <div class="sticky-top" style="top:90px;">
+                    <div class="card p-2 mb-3 text-center">
+                        <span class="text-muted small">(Right Ad Placeholder)</span>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+        <!-- <div class="row g-4"> -->
+            <!-- Legacy duplicated layout removed -->
+            <!-- <div class="col-12 col-md-3 order-1 order-md-2 mb-4 mb-md-0">
                 <!-- Google AdSense Placeholder Start -->
-                <div class="card h-auto p-2 d-flex align-items-center justify-content-center">
+                <!-- <div class="card h-auto p-2 d-flex align-items-center justify-content-center">
                     <!-- Replace below with your actual Google AdSense code -->
-                    <span class="text-muted">(Place your Google AdSense code here)</span>
+                    <!-- <span class="text-muted">(Place your Google AdSense code here)</span>
                     <!-- Example AdSense code: -->
                     <!--
                     <ins class="adsbygoogle"
@@ -339,9 +374,9 @@ $categories = get_categories();
                         (adsbygoogle = window.adsbygoogle || []).push({});
                     </script>
                     -->
-                </div>
+                <!-- </div> -->
                 <!-- Google AdSense Placeholder End -->
-            </div>
+            <!-- </div> -->
             <!-- Videos Section -->
             <div class="col-12 col-md-9 order-2 order-md-1">
                 <div class="row g-4" id="videos-container">
@@ -397,15 +432,6 @@ $categories = get_categories();
                         <li><a href="sitemap.php" class="text-white-50 text-decoration-none">Sitemap</a></li>
                     </ul>
                 </div>
-                <div class="col-md-3">
-                    <h6>Follow Us</h6>
-                    <div class="d-flex gap-3">
-                        <a href="#" class="text-white-50"><i class="fab fa-facebook fa-lg"></i></a>
-                        <a href="#" class="text-white-50"><i class="fab fa-twitter fa-lg"></i></a>
-                        <a href="#" class="text-white-50"><i class="fab fa-instagram fa-lg"></i></a>
-                        <a href="#" class="text-white-50"><i class="fab fa-youtube fa-lg"></i></a>
-                    </div>
-                </div>
             </div>
             <hr class="my-4">
             <div class="text-center text-white-50 small">
@@ -437,6 +463,17 @@ $categories = get_categories();
     let loading = false;
     let hasMore = true;
     let currentSearch = '';
+let videoRenderedCount = 0; // track videos added to insert ads on mobile
+
+function createAdCard() {
+    return `
+        <div class="col-12 d-block d-lg-none">
+            <div class="card p-2 text-center my-2">
+                <span class="text-muted small">(Mobile Ad Placeholder)</span>
+            </div>
+        </div>`;
+}
+
     let currentCategory = '';
 
     function createVideoCard(video) {
@@ -499,6 +536,7 @@ $categories = get_categories();
         currentPage = 1;
         hasMore = true;
         document.getElementById('videos-container').innerHTML = '';
+        videoRenderedCount = 0; // reset counter
         loadMoreVideos();
     }
 
@@ -525,8 +563,13 @@ $categories = get_categories();
                 hasMore = false;
             } else {
                 data.videos.forEach(video => {
+                    
                     const card = createVideoCard(video);
                     document.getElementById('videos-container').insertAdjacentHTML('beforeend', card);
+                    videoRenderedCount++;
+                    if (window.innerWidth < 992 && videoRenderedCount % 6 === 0) {
+                        document.getElementById('videos-container').insertAdjacentHTML('beforeend', createAdCard());
+                    }
                 });
                 // Show/hide Load More button based on has_more
                 if (data.has_more) {

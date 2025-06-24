@@ -32,7 +32,7 @@ require_once 'includes/functions.php';
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="/video_portal/index.php">
+            <a class="navbar-brand" href="index.php">
                 <i class="fas fa-video me-2"></i>
                 OMGTube
             </a>
@@ -41,17 +41,17 @@ require_once 'includes/functions.php';
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/video_portal/index.php">Home</a>
+                    <!-- <li class="nav-item">
+                        <a class="nav-link" href="index.php">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/video_portal/about.php">About</a>
+                        <a class="nav-link" href="about.php">About</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="/video_portal/disclaimer.php">Disclaimer</a>
-                    </li>
+                        <a class="nav-link active" href="disclaimer.php">Disclaimer</a>
+                    </li> -->
                 </ul>
-                <form class="d-flex" action="/video_portal/index.php" method="get">
+                <form class="d-flex" action="index.php" method="get">
                     <input class="form-control me-2" type="search" name="search" placeholder="Search videos...">
                     <button class="btn btn-outline-light" type="submit">Search</button>
                 </form>
@@ -104,13 +104,13 @@ require_once 'includes/functions.php';
                 <div class="col-md-3">
                     <h6>Quick Links</h6>
                     <ul class="list-unstyled">
-                        <li><a href="/video_portal/index.php" class="text-white-50 text-decoration-none">Home</a></li>
-                        <li><a href="/video_portal/about.php" class="text-white-50 text-decoration-none">About Us</a></li>
-                        <li><a href="/video_portal/disclaimer.php" class="text-white-50 text-decoration-none">Disclaimer</a></li>
-                        <li><a href="/video_portal/admin/login.php" class="text-white-50 text-decoration-none">Admin Login</a></li>
+                        <li><a href="index.php" class="text-white-50 text-decoration-none">Home</a></li>
+                        <li><a href="about.php" class="text-white-50 text-decoration-none">About Us</a></li>
+                        <li><a href="disclaimer.php" class="text-white-50 text-decoration-none">Disclaimer</a></li>
+                        <!-- <li><a href="admin/login.php" class="text-white-50 text-decoration-none">Admin Login</a></li> -->
                     </ul>
                 </div>
-                <div class="col-md-3">
+                <!-- <div class="col-md-3">
                     <h6>Follow Us</h6>
                     <div class="d-flex gap-3">
                         <a href="#" class="text-white-50"><i class="fab fa-facebook fa-lg"></i></a>
@@ -118,7 +118,7 @@ require_once 'includes/functions.php';
                         <a href="#" class="text-white-50"><i class="fab fa-instagram fa-lg"></i></a>
                         <a href="#" class="text-white-50"><i class="fab fa-youtube fa-lg"></i></a>
                     </div>
-                </div>
+                </div> -->
             </div>
             <hr class="my-4">
             <div class="text-center text-white-50 small">

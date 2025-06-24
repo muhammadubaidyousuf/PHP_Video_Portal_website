@@ -5,41 +5,50 @@ require_once 'includes/functions.php';
 
 
 
-$category_slug = isset($_GET['category']) ? $_GET['category'] : '';
-$video_slug = isset($_GET['slug']) ? $_GET['slug'] : '';
+// Get categories for search filter
+$categories = get_categories();
 
-if (empty($category_slug) || empty($video_slug)) {
+// Get parameters from friendly URL
+$video_id      = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$category_slug = isset($_GET['category']) ? $_GET['category'] : '';
+$video_slug    = isset($_GET['slug']) ? $_GET['slug'] : '';
+
+// Basic validation – must have a numeric id
+if ($video_id === 0) {
     header('Location: /index.php');
     exit();
 }
 
-
-
-// // Get category and slug
-// $category_slug = isset($_GET['category']) ? $_GET['category'] : '';
-// $video_slug = isset($_GET['slug']) ? $_GET['slug'] : '';
-
-// if (empty($category_slug) || empty($video_slug)) {
-//     header('Location: /index.php');
-//     exit();
-// }
-
-// Get video details
-$query = "SELECT v.*, c.name as category_name,
-          COALESCE(v.video_id, '') as embed_video_id,
-          COALESCE(v.source, '') as video_source
-          FROM videos v 
-          LEFT JOIN categories c ON v.category_id = c.id 
-          WHERE LOWER(REPLACE(c.name, ' ', '-')) = ? 
-          AND LOWER(REPLACE(REPLACE(v.title, ' ', '-'), '.', '-')) = ? 
-          AND v.status = 'active'";
+// Fetch the video using its primary key (fast and unambiguous)
+$query = "SELECT v.*, c.name AS category_name,
+                 COALESCE(v.video_id, '')  AS embed_video_id,
+                 COALESCE(v.source, '')    AS video_source
+          FROM videos v
+          LEFT JOIN categories c ON v.category_id = c.id
+          WHERE v.id = ? AND v.status = 'active'";
 $stmt = $conn->prepare($query);
-$stmt->bind_param("ss", $category_slug, $video_slug);
+$stmt->bind_param("i", $video_id);
 $stmt->execute();
 $video = $stmt->get_result()->fetch_assoc();
 
 if (!$video) {
+    // Video not found – maybe deleted or inactive
     header('Location: /index.php');
+    exit();
+}
+
+// Optional: ensure the slugs in the URL are canonical; if not, redirect to the canonical URL
+require_once __DIR__ . '/includes/functions.php';
+$expected_cat_slug   = create_slug($video['category_name']);
+$expected_video_slug = create_slug($video['slug'] ?: $video['title']);
+
+if ($category_slug !== $expected_cat_slug || $video_slug !== $expected_video_slug) {
+    $canonical = get_video_url([
+        'id'            => $video['id'],
+        'category_slug' => $expected_cat_slug,
+        'slug'          => $expected_video_slug
+    ]);
+    header("Location: {$canonical}", true, 301);
     exit();
 }
 
@@ -65,8 +74,8 @@ $related_videos = $stmt->get_result();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <title><?php echo $video['title']; ?> - OMGTube</title>
+    <link rel="icon" type="image/x-icon" href="./assets/favicon.ico">
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -169,13 +178,23 @@ $related_videos = $stmt->get_result();
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/index.php">Home</a>
-                    </li>
+
                 </ul>
                 <form class="d-flex" action="/index.php" method="get">
-                    <input class="form-control me-2" type="search" name="search" placeholder="Search videos...">
-                    <button class="btn btn-outline-light" type="submit">Search</button>
+                    <div class="input-group">
+                        <select name="category" class="form-select" style="max-width:200px;">
+                            <option value="">All Categories</option>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?php echo $cat['id']; ?>" <?php echo (isset($_GET['category']) && $_GET['category'] == $cat['id']) ? 'selected' : ''; ?>>
+                                    <?php echo $cat['name']; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <input type="text" name="search" class="form-control" placeholder="Search videos..." value="<?php echo isset($_GET['search']) ? htmlspecialchars($_GET['search']) : ''; ?>">
+                        <button class="btn btn-outline-light" type="submit">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -244,7 +263,14 @@ $related_videos = $stmt->get_result();
                 <h5 class="mb-3">Related Videos</h5>
                 <?php if ($related_videos->num_rows > 0): ?>
                     <?php while ($related = $related_videos->fetch_assoc()): ?>
-                        <a href="/video/<?php echo $related['id']; ?>/<?php echo strtolower(str_replace(' ', '-', preg_replace('/[^a-zA-Z0-9\s-]/', '', $related['title']))); ?>" class="text-decoration-none text-dark">
+                        <?php 
+    $related_link = get_video_url([
+        'id'            => $related['id'],
+        'slug'          => create_slug($related['slug'] ?: $related['title']),
+        'category_slug' => create_slug($related['category_name'])
+    ]);
+?>
+<a href="<?php echo htmlspecialchars($related_link); ?>" class="text-decoration-none text-dark">
                             <div class="card shadow-sm mb-3 related-video">
                                 <div class="row g-0">
                                     <div class="col-4">
@@ -293,6 +319,14 @@ $related_videos = $stmt->get_result();
         </div>
     </div>
 
+    <!-- Horizontal Ad (Above Footer) -->
+    <div class="container my-4">
+        <div class="card p-3 text-center d-flex align-items-center justify-content-center">
+            <!-- Replace below with your actual Google AdSense code -->
+            <span class="text-muted">(Place your horizontal Google AdSense code here)</span>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="bg-dark text-white py-4 mt-5">
         <div class="container">
@@ -309,15 +343,6 @@ $related_videos = $stmt->get_result();
                         <li><a href="disclaimer.php" class="text-white-50 text-decoration-none">Disclaimer</a></li>
                         <li><a href="/admin/login.php" class="text-white-50 text-decoration-none">Admin Login</a></li>
                     </ul>
-                </div>
-                <div class="col-md-3">
-                    <h6>Follow Us</h6>
-                    <div class="d-flex gap-3">
-                        <a href="#" class="text-white-50"><i class="fab fa-facebook fa-lg"></i></a>
-                        <a href="#" class="text-white-50"><i class="fab fa-twitter fa-lg"></i></a>
-                        <a href="#" class="text-white-50"><i class="fab fa-instagram fa-lg"></i></a>
-                        <a href="#" class="text-white-50"><i class="fab fa-youtube fa-lg"></i></a>
-                    </div>
                 </div>
             </div>
             <hr class="my-4">
