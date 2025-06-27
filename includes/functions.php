@@ -14,7 +14,10 @@ function sanitize($data) {
 // Create URL friendly slug
 function create_slug($string) {
   $slug = preg_replace('~[^\pL\d]+~u', '-', $string);
-  $slug = iconv('utf-8', 'us-ascii//TRANSLIT', $slug);
+  $converted = @iconv('utf-8','us-ascii//TRANSLIT',$slug);
+  if($converted !== false){
+    $slug = $converted;
+  }
   $slug = preg_replace('~[^-\w]+~', '', $slug);
   $slug = trim($slug);
   $slug = preg_replace('~-+~', '-', $slug);
