@@ -63,12 +63,17 @@ while ($video = $result->fetch_assoc()) {
         $thumbnail = "uploads/thumbnails/{$video['thumbnail']}";
     }
 
+    // Clean slugs using helper
+    $category_slug = create_slug($video['category_name']);
+    $video_slug    = create_slug($video['title']);
+
     $videos[] = [
         'id' => $video['id'],
         'title' => $video['title'],
         'category_name' => $video['category_name'],
-        'category_slug' => $video['category_slug'],
-        'video_slug' => $video['slug'],
+        'category_slug' => $category_slug,
+        'video_slug' => $video_slug,
+        'friendly_url' => get_video_url(['id'=>$video['id'],'slug'=>$video_slug,'category_slug'=>$category_slug]),
         'source' => $video['source'],
         'video_id' => $video['video_id'],  // Add the video_id for embedding
         'thumbnail' => $thumbnail,

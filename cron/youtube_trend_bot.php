@@ -1,157 +1,170 @@
 <?php
-// cron/youtube_trend_bot.php
-// --------------------------------------------------
-// This CLI script fetches YouTube trending videos and saves them
-// Requires a cron / task-scheduler entry, e.g.
-//    */30 * * * * php /path/to/cron/youtube_trend_bot.php
-// --------------------------------------------------
+/**
+ * YouTube Trend Bot – OMGTube
+ *
+ * Yeh CLI script har 6 ghante chalne ke liye design hai.
+ * Kaam:
+ * 1. Categories DB se uthaye.
+ * 2. Har category ke liye YouTube Data API (v3) se trending / popular videos nikale.
+ * 3. Naye videos ko videos table me insert kare (agar pehle se na hon).
+ * 4. Title se tags nikaal-kar tags & video_tags tables me save kare.
+ *
+ * PHP 7.4+  –  CLI mode
+ * Run example:
+ *     php /absolute/path/cron/youtube_trend_bot.php
+ */
 
-require_once dirname(__DIR__) . '/config/database.php';
-require_once dirname(__DIR__) . '/includes/functions.php';
+// ==== CONFIGURATION =========================================================
+// DB config include
+require_once __DIR__ . '/../config/database.php';  // $conn mysqli object
+require_once __DIR__ . '/../includes/functions.php';
 
-// 1. Read bot settings ------------------------------------------------------
-$settings = [
-    'enabled'      => true,
-    'region'       => 'PK',
-    'max_videos'   => 1,
-    'last_run'     => null,
-    'freq_minutes' => 1,
-];
-$res = $conn->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'trend_bot_%'");
-while ($row = $res->fetch_assoc()) {
-    $key = str_replace('trend_bot_', '', $row['setting_key']);
-    $settings[$key] = $row['setting_value'];
+// YouTube API key
+$api_key = '';
+$keyStmt = $conn->prepare("SELECT setting_value FROM settings WHERE setting_key='youtube_api_key' LIMIT 1");
+if ($keyStmt && $keyStmt->execute()) {
+    $keyStmt->bind_result($api_key);
+    $keyStmt->fetch();
+    $keyStmt->close();
 }
-if (!$settings['enabled']) {
-    exit; // bot disabled
-}
-
-// Throttle : run only if freq_minutes passed
-if ($settings['last_run']) {
-    $next = strtotime($settings['last_run']) + ($settings['freq_minutes'] * 60);
-    if (time() < $next) exit; // not yet time
-}
-
-// 2. Get YouTube API key -----------------------------------------------------
-$apiKey = '';
-$keyRes = $conn->query("SELECT setting_value FROM settings WHERE setting_key='youtube_api_key' LIMIT 1");
-if ($keyRes && $keyRes->num_rows) {
-    $apiKey = $keyRes->fetch_assoc()['setting_value'];
-}
-if (!$apiKey) {
-    error_log('trend_bot: API key missing');
-    exit;
+if (empty($api_key)) {
+    echo "[Error] YouTube API key not found.\n";
+    exit(1);
 }
 
-    'howto & style'=>26,
-    'education'=>27,
-    'science & technology'=>28,
-    'movies'=>30,
-    'anime/animation'=>31,
-    'action/adventure'=>32,
-    'classics'=>33,
-    'documentary'=>35,
-];
-$url = 'https://www.googleapis.com/youtube/v3/videos?' . http_build_query($params);
-$ch  = curl_init($url);
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_SSL_VERIFYPEER => false,
-]);
-$resp = curl_exec($ch);
-if ($resp === false) {
-    error_log('trend_bot: curl error ' . curl_error($ch));
-    curl_close($ch);
-    exit;
-}
-$http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
-if ($http !== 200) {
-    error_log('trend_bot: HTTP ' . $http);
-    exit;
-}
-$json = json_decode($resp, true);
-if (!isset($json['items'])) exit;
+// ==== FUNCTIONS ============================================================
+/**
+ * YouTube search se popular/trending videos list karta hai.
+ * @param string $query  – category ka naam
+ * @param string $api_key
+ * @param int    $maxResults
+ * @return array<array>  – each item [id,title,thumbnail]
+ */
+function fetch_youtube_videos(string $query, string $api_key, int $maxResults = 10, string $region = 'US'): array {
+    $url = sprintf(
+        'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=%d&regionCode=%s&order=viewCount&q=%s&key=%s',
+        $maxResults,
+        $region,
+        urlencode($query . ' trending'),
+        $api_key
+    );
 
-$added = 0;
-foreach ($json['items'] as $item) {
-    $vid  = $item['id'] ?? null;
-    if (!$vid) continue;
-    // duplicate check
-    $stmt = $conn->prepare("SELECT id FROM videos WHERE video_id=? AND source='youtube' LIMIT 1");
-    $stmt->bind_param('s', $vid);
-    $stmt->execute();
-    $stmt->store_result();
-    if ($stmt->num_rows) { $stmt->close(); continue; }
-    $stmt->close();
-
-    $snippet = $item['snippet'];
-    $title   = $snippet['title'];
-    $thumb   = $snippet['thumbnails']['medium']['url'];
-    $slug    = create_slug($title);
-
-    // Attempt to map category via tags
-    $video_cat_id = null;
-    if (!empty($snippet['tags'])) {
-        $tags = $snippet['tags'];
-        // fetch category
-        $catRes = $conn->query("SELECT id,name,slug FROM categories");
-        $catMap = [];
-        while($r=$catRes->fetch_assoc()) {
-            $catMap[strtolower($r['name'])] = $r['id'];
-            $catMap[strtolower($r['slug'])] = $r['id'];
-        }
-        foreach ($tags as $t) {
-            $lk = strtolower($t);
-            if (isset($catMap[$lk])) { $video_cat_id = $catMap[$lk]; break; }
-        }
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+    ]);
+    $response = curl_exec($ch);
+    if (curl_errno($ch)) {
+        curl_close($ch);
+        return [];
     }
+    curl_close($ch);
 
-    // Prepare insert statement with correct parameter types
-    $stmt = $conn->prepare("INSERT INTO videos (title, slug, source, video_id, thumbnail, category_id, status, created_at, updated_at) VALUES (?,?,?,?,?,?, 'active', NOW(), NOW())");
-    // title, slug, source, video_id, thumbnail = string, category_id = int
-    $src = 'youtube';
-    $stmt->bind_param('sssssi', $title, $slug, $src, $vid, $thumb, $video_cat_id);
-    if (!$stmt->execute()) {
-        // Log any DB error for debugging
-        error_log('trend_bot DB insert error: '.$stmt->error);
-    } else {
-        $video_id_db = $conn->insert_id;
-        $added++;
-        // save tags
-        if (!empty($snippet['tags'])) {
-            foreach($snippet['tags'] as $tag){
-                $tag_slug = create_slug($tag);
-                $tag_id=0;
-                $tStmt=$conn->prepare("SELECT id FROM tags WHERE slug=? LIMIT 1");
-                $tStmt->bind_param('s',$tag_slug);
-                $tStmt->execute();
-                $tStmt->bind_result($tag_id);
-                if(!$tStmt->fetch()){
-                    $tStmt->close();
-                    $ins=$conn->prepare("INSERT INTO tags (name,slug,created_at) VALUES (?,?,NOW())");
-                    $ins->bind_param('ss',$tag,$tag_slug);
-                    $ins->execute();
-                    $tag_id=$conn->insert_id;
-                    $ins->close();
-                } else { $tStmt->close(); }
-                $conn->query("INSERT IGNORE INTO video_tags (video_id,tag_id) VALUES ($video_id_db,$tag_id)");
+    $data = json_decode($response, true);
+    if (!isset($data['items'])) return [];
+
+    $videos = [];
+    foreach ($data['items'] as $item) {
+        $videos[] = [
+            'video_id'  => $item['id']['videoId'] ?? '',
+            'title'     => $item['snippet']['title'] ?? '',
+            'thumbnail' => $item['snippet']['thumbnails']['medium']['url'] ?? '',
+        ];
+    }
+    return $videos;
+}
+
+// ==== MAIN ==================================================================
+// runtime settings
+$region      = get_setting('yt_region', 'US');
+$maxResults  = (int) get_setting('yt_max_results', 15);
+// CLI args can override if provided
+if(isset($argv[1])) $region = $argv[1];
+if(isset($argv[2])) $maxResults = (int)$argv[2];
+if($maxResults<1||$maxResults>50){$maxResults=15;}
+$insertedCount = 0;
+$dateNow       = date('Y-m-d H:i:s');
+
+// Categories fetch karo
+$catRes = $conn->query("SELECT id, name FROM categories ORDER BY id ASC");
+if (!$catRes) {
+    echo "DB error fetching categories\n";
+    exit(1);
+}
+
+while ($cat = $catRes->fetch_assoc()) {
+    $catId   = (int) $cat['id'];
+    $catName = $cat['name'];
+    echo "[*] Processing category: {$catName}\n";
+
+    // YouTube se videos lao
+    $ytVideos = fetch_youtube_videos($catName, $api_key, $maxResults, $region);
+    foreach ($ytVideos as $v) {
+        if (empty($v['video_id'])) continue;
+
+        // Duplicate check
+        $dupStmt = $conn->prepare("SELECT id FROM videos WHERE video_id = ? AND source = 'youtube' LIMIT 1");
+        $dupStmt->bind_param('s', $v['video_id']);
+        $dupStmt->execute();
+        $dupStmt->store_result();
+        if ($dupStmt->num_rows > 0) {
+            $dupStmt->close();
+            continue; // already exist
+        }
+        $dupStmt->close();
+
+                // Prepare variables for bind_param (needs references)
+        $title    = $v['title'];
+        $src      = 'youtube';
+        $videoId  = $v['video_id'];
+        $thumb    = $v['thumbnail'];
+
+        // Insert video
+        $status     = 'active';
+                $insertStmt = $conn->prepare("INSERT INTO videos (title, source, video_id, thumbnail, category_id, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)");
+        $insertStmt->bind_param('ssssisss', $title, $src, $videoId, $thumb, $catId, $status, $dateNow, $dateNow);
+        if ($insertStmt->execute()) {
+            $videoDbId = $insertStmt->insert_id;
+            $insertedCount++;
+            echo "    [+] Added video: {$v['title']}\n";
+
+            // Auto-tags (simple split by space, # remove) – optional
+            $words = array_filter(explode(' ', preg_replace('/[^\p{L}\p{N}# ]+/u', '', $v['title'])));
+            foreach ($words as $word) {
+                $word = trim($word, "#\n\r\t ");
+                if (mb_strlen($word) < 3) continue;
+                $slug = create_slug($word);
+                if (empty($slug)) continue;
+
+                // tag exists?
+                $tagId = 0;
+                $tagSel = $conn->prepare("SELECT id FROM tags WHERE slug = ? LIMIT 1");
+                $tagSel->bind_param('s', $slug);
+                $tagSel->execute();
+                $tagSel->bind_result($tagId);
+                if (!$tagSel->fetch()) {
+                    $tagSel->close();
+                    // insert new tag
+                    $tagIns = $conn->prepare("INSERT INTO tags (name, slug, created_at) VALUES (?,?,?)");
+                    $tagIns->bind_param('sss', $word, $slug, $dateNow);
+                    $tagIns->execute();
+                    $tagId = $tagIns->insert_id;
+                    $tagIns->close();
+                } else {
+                    $tagSel->close();
+                }
+
+                // link tag
+                $link = $conn->prepare("INSERT IGNORE INTO video_tags (video_id, tag_id) VALUES (?,?)");
+                $link->bind_param('ii', $videoDbId, $tagId);
+                $link->execute();
+                $link->close();
             }
         }
+        $insertStmt->close();
     }
-    $stmt->close();
 }
 
-// 4. Update last_run --------------------------------------------------------
-$now = date('Y-m-d H:i:s');
-$upd = $conn->prepare("REPLACE INTO settings (setting_key, setting_value) VALUES ('trend_bot_last_run', ?) ");
-$upd->bind_param('s', $now);
-$upd->execute();
-$upd->close();
-// store last added count
-$cntStmt = $conn->prepare("REPLACE INTO settings (setting_key, setting_value) VALUES ('trend_bot_last_added', ?)");
-$cntStmt->bind_param('s', $added);
-$cntStmt->execute();
-$cntStmt->close();
-
-echo "trend_bot added $added videos at $now\n";
+echo "\nTotal new videos added: {$insertedCount}\n";
+$conn->close();

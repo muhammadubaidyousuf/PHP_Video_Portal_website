@@ -459,6 +459,7 @@ $categories = get_categories();
 
     <!-- Infinite Scroll Script -->
     <script>
+    const originalTitle = document.title;
     let currentPage = 1;
     let loading = false;
     let hasMore = true;
@@ -483,7 +484,8 @@ function createAdCard() {
                     <a href="javascript:void(0);" class="text-decoration-none video-link" 
                        data-video-id="${video.video_id}" 
                        data-video-source="${video.source}" 
-                       data-video-title="${video.title}">
+                       data-video-title="${video.title}" 
+                       data-video-url="${video.friendly_url}">
                         <div class="video-thumbnail">
                             <div class="video-source">
                                 ${video.source === 'youtube' ? '<span class="badge bg-danger"><i class="fab fa-youtube"></i></span>' : ''}
@@ -496,9 +498,6 @@ function createAdCard() {
                                     <i class="fas fa-video fa-3x text-white-50"></i>
                                 </div>`
                             }
-                            <div class="play-icon">
-                                <i class="fas fa-play-circle"></i>
-                            </div>
                         </div>
                     </a>
                     <div class="card-body">
@@ -506,7 +505,8 @@ function createAdCard() {
                             <a href="javascript:void(0);" class="text-decoration-none text-dark video-link"
                                data-video-id="${video.video_id}" 
                                data-video-source="${video.source}" 
-                               data-video-title="${video.title}">
+                               data-video-title="${video.title}" 
+                       data-video-url="${video.friendly_url}">
                                 ${video.title}
                             </a>
                         </h6>
@@ -616,6 +616,15 @@ function createAdCard() {
             const videoId = videoLink.getAttribute('data-video-id');
             const videoSource = videoLink.getAttribute('data-video-source');
             const videoTitle = videoLink.getAttribute('data-video-title');
+            const videoUrl  = videoLink.getAttribute('data-video-url');
+            // push friendly URL to address bar without navigating
+            if(videoUrl){
+                history.pushState({popup:true}, '', videoUrl);
+            }
+            // update browser title to video title
+            if(videoTitle){
+                document.title = videoTitle + ' - OMGTube';
+            }
             
             console.log('Opening video:', { videoId, videoSource, videoTitle });
             
@@ -673,6 +682,12 @@ function createAdCard() {
 
     // Reset video when modal is closed
     document.getElementById('videoLightbox').addEventListener('hidden.bs.modal', function () {
+        // revert URL when modal closes
+        if(history.state && history.state.popup){
+            history.back();
+        }
+        // restore original title
+        document.title = originalTitle;
         document.getElementById('videoContainer').innerHTML = '';
     });
     </script>

@@ -4,6 +4,31 @@
  */
 
 // Sanitize input data
+// ================= Settings Helpers =================
+function get_setting($key, $default = '') {
+    global $conn;
+    $val = $default;
+    $stmt = $conn->prepare("SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1");
+    if($stmt){
+        $stmt->bind_param('s', $key);
+        $stmt->execute();
+        $stmt->bind_result($val);
+        if(!$stmt->fetch()){
+            $val = $default;
+        }
+        $stmt->close();
+    }
+    return $val;
+}
+
+function set_setting($key, $value){
+    global $conn;
+    $stmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+    $stmt->bind_param('ss', $key, $value);
+    $stmt->execute();
+    $stmt->close();
+}
+
 function sanitize($data) {
     $data = trim($data);
     $data = stripslashes($data);
